@@ -22,13 +22,26 @@ folder = os.path.join(current_path,
 # Read list of all files for classification
 class_file = open(os.path.join(folder, 'ImageSets', 'Main', 'trainval.txt'))
 class_list = class_file.read().splitlines()
+# Split data
+class_train_list, class_valtest_list = train_test_split(class_list, test_size=0.3, random_state=42)
+class_val_list, class_test_list = train_test_split(class_valtest_list, test_size=0.33, random_state=42)
+
+with open('class_train.txt', 'w') as f:
+    for item in class_train_list:
+        f.write("%s\n" % item)
+with open('class_val.txt', 'w') as f:
+    for item in class_val_list:
+        f.write("%s\n" % item)
+with open('class_test.txt', 'w') as f:
+    for item in class_test_list:
+        f.write("%s\n" % item)
 
 # Read list of all files for segmentation
 segm_file = open(os.path.join(folder, 'ImageSets', 'Segmentation', 'trainval.txt'))
 segm_list = segm_file.read().splitlines()
 # Split data
-segm_train_list, segm_valtest_list = train_test_split(segm_list, test_size=0.5, random_state=42)
-segm_val_list, segm_test_list = train_test_split(segm_valtest_list, test_size=0.5, random_state=42)
+segm_train_list, segm_valtest_list = train_test_split(segm_list, test_size=0.3, random_state=42)
+segm_val_list, segm_test_list = train_test_split(segm_valtest_list, test_size=0.33, random_state=42)
 
 with open('segm_train.txt', 'w') as f:
     for item in segm_train_list:
