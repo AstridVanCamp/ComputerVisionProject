@@ -5,13 +5,10 @@ Created on Tue Apr 21 18:42:43 2020
 @author: astri
 """
 
-import numpy as np
-import cv2
 import os
 
 from sklearn.model_selection import train_test_split
 
-# from os import path
 # current path is fetched
 current_path = os.getcwd()
 # folder is fetched where images are located dynamically
