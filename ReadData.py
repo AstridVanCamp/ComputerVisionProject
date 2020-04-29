@@ -7,26 +7,42 @@ Created on Tue Apr 21 18:42:43 2020
 
 import cv2
 import os
+import numpy as np
 
-def get_JPEGimages(filename, image_dir):
+def get_JPEGimages(filename, image_dir, resize=False):
     image_list = open(filename)
-    images = list()
+    images = []
     for line in image_list:
         file = os.path.join(image_dir, 'JPEGImages', line.strip()+'.jpg')
         img = cv2.imread(file)
-        images.append(img)    
-    
-    return images
+        
+        if resize:
+            # Resize images to 375x500 as this is one of the most common sizes in the training data
+            nrows = 375
+            ncols = 500
+            img = cv2.resize(img, (ncols,nrows))
+            
+        images.append(img)
+        
+    return np.asarray(images)
 
-def get_PNGsegments(filename, image_dir):
+
+def get_PNGsegments(filename, image_dir, resize=False):
     image_list = open(filename)
-    images = list()
+    images = []
     for line in image_list:
         file = os.path.join(image_dir, 'SegmentationClass', line.strip()+'.png')
         img = cv2.imread(file)
+        
+        if resize:
+            # Resize images to 375x500 as this is one of the most common sizes in the training data
+            nrows = 375
+            ncols = 500
+            img = cv2.resize(img, (ncols,nrows))
+        
         images.append(img)    
     
-    return images
+    return np.asarray(images)
     
 
 # current path is fetched

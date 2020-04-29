@@ -7,6 +7,7 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#devkit
 import numpy as np
 from skimage.io import imshow
 import matplotlib.pyplot as plt
+import cv2
 
 def color_map(N=256, normalized=False):
     def bitget(byteval, idx):
@@ -45,4 +46,14 @@ def color_map_viz():
     plt.xticks([])
     plt.show()
     
-color_map_viz()
+
+
+def one_hot_encode(mask, num_colors):
+    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
+    cmap = color_map()[:num_colors+2]
+    one_hot_map = np.zeros((mask.shape[0], mask.shape[1], num_colors+2))
+    for idx, color in enumerate(cmap):
+        is_color = cv2.inRange(mask, color, color)
+        one_hot_map[:,:,idx] = is_color/255
+    
+    return one_hot_map
