@@ -8,6 +8,7 @@ Created on Tue Apr 21 18:42:43 2020
 import cv2
 import os
 import numpy as np
+from VOClabelcolormap import unique_class
 
 def get_JPEGimages(filename, image_dir, resize=False):
     image_list = open(filename)
@@ -17,12 +18,11 @@ def get_JPEGimages(filename, image_dir, resize=False):
         img = cv2.imread(file)
         
         if resize:
-            # Resize images to 375x500 as this is one of the most common sizes in the training data
-            nrows = 375
-            ncols = 500
+            nrows = 256
+            ncols = 256
             img = cv2.resize(img, (ncols,nrows))
             
-        images.append(img)
+        images.append(img/255)
         
     return np.asarray(images)
 
@@ -35,10 +35,11 @@ def get_PNGsegments(filename, image_dir, resize=False):
         img = cv2.imread(file)
         
         if resize:
-            # Resize images to 375x500 as this is one of the most common sizes in the training data
-            nrows = 375
-            ncols = 500
+            nrows = 256
+            ncols = 256
             img = cv2.resize(img, (ncols,nrows))
+        
+        #img_mask = one_hot_encode(img, 20)
         
         images.append(img)    
     

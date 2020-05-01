@@ -45,15 +45,15 @@ def color_map_viz():
     plt.yticks([row_size*i+row_size/2 for i in range(nclasses+1)], labels)
     plt.xticks([])
     plt.show()
-    
 
 
-def one_hot_encode(mask, num_colors):
+def unique_class(mask, num_colors):
     mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
     cmap = color_map()[:num_colors+2]
-    one_hot_map = np.zeros((mask.shape[0], mask.shape[1], num_colors+2))
+    unique_mask = np.zeros((mask.shape[0],mask.shape[1]))
     for idx, color in enumerate(cmap):
-        is_color = cv2.inRange(mask, color, color)
-        one_hot_map[:,:,idx] = is_color/255
+        is_color = cv2.inRange(mask, color, color)/255
+        unique_mask = unique_mask + is_color*idx
     
-    return one_hot_map
+    return unique_mask.reshape((mask.shape[0]*mask.shape[1],1))
+    

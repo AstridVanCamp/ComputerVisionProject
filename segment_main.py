@@ -4,29 +4,30 @@ Created on Sat Apr 25 17:39:40 2020
 
 @author: astri
 """
+#%%
 import os
-import matplotlib.pyplot as plt
-import cv2
+import random
 import numpy as np
 
+from ReadData import get_JPEGimages, get_PNGsegments
+from VOClabelcolormap import unique_class
+from keras.utils import to_categorical
+from  tensorflow.keras.preprocessing.image import apply_affine_transform as transform
+
+from keras import backend as K
+from keras_segmentation.models.model_utils import get_segmentation_model
+
 from keras import layers
-from keras import models
 from keras import optimizers
-from keras_segmentation.models.unet import vgg_unet
-from keras.preprocessing.image import ImageDataGenerator
+
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import CSVLogger
 from keras.callbacks import EarlyStopping
-from keras.optimizers import Adam
 
-from ReadData import get_JPEGimages, get_PNGsegments
-from VOClabelcolormap import one_hot_encode
-
-from keras import backend as K
-
+#%%
 def dice_coef(y_true, y_pred, smooth=1):
     
-    y_true_f = K.flatten(K.one_hot(K.cast(y_true, 'int32'), num_classes=21)[...,1:])
+    y_true_f = K.flatten(K.one_hot(K.cast(y_true, 'int32'), num_classes=22)[...,1:])
     y_pred_f = K.flatten(y_pred[...,1:])
     intersect = K.sum(y_true_f * y_pred_f, axis=-1)
     denom = K.sum(y_true_f + y_pred_f, axis=-1)
@@ -38,86 +39,137 @@ def dice_coef_loss(y_true, y_pred):
     '''
     return 1 - dice_coef(y_true, y_pred)
 
-## Load data
-# current path is fetched
-current_path = os.getcwd()
-# folder is fetched where images are located dynamically
-folder = os.path.join(current_path,
-                             'VOCtrainval_11-May-2009',
-                             'VOCdevkit',
-                             'VOC2009')
-segm_resize = True
-segm_train_img = get_JPEGimages('segm_train.txt', folder, resize=segm_resize)
-segm_val_img = get_JPEGimages('segm_val.txt', folder, resize=segm_resize)
-segm_test_img = get_JPEGimages('segm_test.txt', folder, resize=segm_resize)
+#%%
+def train_data_gen(filelist, batch_size, num_classes):
+    # current path is fetched
+    current_path = os.getcwd()
+    # folder is fetched where images are located dynamically
+    folder = os.path.join(current_path,
+                                  'VOCtrainval_11-May-2009',
+                                  'VOCdevkit',
+                                  'VOC2009')
+    segm_resize = True
+    segm_img = get_JPEGimages(filelist, folder, resize=segm_resize)
+    segm_mask = get_PNGsegments(filelist, folder, resize=segm_resize).astype(np.uint8)
+    
+    c = 0  
+    while(True):        
+        images = np.zeros((batch_size, 256, 256, 3)).astype('float')
+        masks = np.zeros((batch_size, 256*256, num_classes+2)).astype('float')
+    
+        for i in range(c, min(c+np.int(batch_size/2),len(segm_img))): #initially from 0 to 16, c = 0.  
+            # Each original image is added to the training data
+            images[i-c] = segm_img[i]        
+            img_mask = unique_class(segm_mask[i], num_classes)
+            masks[i-c] = to_categorical(img_mask, num_classes=num_classes+2)
+        
+            # Next to this each image is either rotated or flipped and added to the training data
+            if random.random() > 0.5:
+                img = transform(segm_img[i], theta=90)
+                img_mask = transform(segm_mask[i], theta=90)
+            else:
+                img = np.flip(segm_img[i], axis=1)
+                img_mask = np.flip(segm_mask[i], axis=1)
+              
+            images[i-c+np.int(batch_size/2)] = img         
+            img_mask = unique_class(img_mask, num_classes)
+            masks[i-c+np.int(batch_size/2)] = to_categorical(img_mask, num_classes=num_classes+2)
+    
+        c+=np.int(batch_size/2)
+    
+        yield images, masks
+        
+def val_data_gen(filelist, batch_size, num_classes):
+    # current path is fetched
+    current_path = os.getcwd()
+    # folder is fetched where images are located dynamically
+    folder = os.path.join(current_path,
+                                  'VOCtrainval_11-May-2009',
+                                  'VOCdevkit',
+                                  'VOC2009')
+    segm_resize = True
+    segm_img = get_JPEGimages(filelist, folder, resize=segm_resize)
+    segm_mask = get_PNGsegments(filelist, folder, resize=segm_resize).astype(np.uint8)
+    
+    c = 0  
+    while(True):        
+        images = np.zeros((batch_size, 256, 256, 3)).astype('float')
+        masks = np.zeros((batch_size, 256*256, num_classes+2)).astype('float')
+    
+        for i in range(c, min(c+batch_size,len(segm_img))): #initially from 0 to 16, c = 0.  
+            # Each original image is added to the training data
+            images[i-c] = segm_img[i]        
+            img_mask = unique_class(segm_mask[i], num_classes)
+            masks[i-c] = to_categorical(img_mask, num_classes=num_classes+2)
 
-segm_train_class = get_PNGsegments('segm_train.txt', folder, resize=segm_resize)
-segm_val_class = get_PNGsegments('segm_val.txt', folder, resize=segm_resize)
-segm_test_class = get_PNGsegments('segm_test.txt', folder, resize=segm_resize)
+        c+=batch_size
+    
+        yield images, masks
+        
 
-train_masks = one_hot_encode(segm_train_class, 20)
-val_masks = one_hot_encode(segm_val_class, 20)
-test_masks = one_hot_encode(segm_test_class, 20)
+#%% Load data
+batch_size = 16
+num_classes = 20
 
-## Create batches (and data augmentation)
-batch_size = 32
+train_gen = train_data_gen('segm_train.txt', batch_size, num_classes)
+val_gen = val_data_gen('segm_val.txt', batch_size, num_classes)
+test_gen = val_data_gen('segm_test.txt', batch_size, num_classes)
 
-train_datagen = ImageDataGenerator(
-        rescale=1./255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True)
-train_img_gen = train_datagen.flow(segm_train_img, batch_size=batch_size)
-train_class_gen = train_datagen.flow(segm_train_class, batch_size=batch_size)
-train_generator = zip(train_img_gen, train_class_gen)
+#%% Define neural network
+img_input = layers.Input(shape=(256,256,3))
 
-val_datagen = ImageDataGenerator(rescale=1./255)
-val_img_gen = val_datagen.flow(segm_val_img, batch_size=batch_size)
-val_class_gen =val_datagen.flow(segm_val_class, batch_size=batch_size)
-val_generator = zip(val_img_gen, val_class_gen)
+conv1 = layers.Conv2D(32, (3,3), activation='relu', padding='same')(img_input)
+conv1 = layers.Dropout(0.2)(conv1)
+conv1 = layers.Conv2D(32, (3,3), activation='relu', padding='same')(conv1)
+pool1 = layers.MaxPooling2D((2,2))(conv1)
 
-NO_OF_TRAINING_IMAGES = len(segm_train_img)
-NO_OF_VAL_IMAGES = len(segm_val_img)
+conv2 = layers.Conv2D(64, (3,3), activation='relu', padding='same')(pool1)
+conv2 = layers.Dropout(0.2)(conv2)
+conv2 = layers.Conv2D(64, (3,3), activation='relu', padding='same')(conv2)
+pool2 = layers.MaxPooling2D((2,2))(conv2)
 
-del segm_train_img, segm_train_class, segm_val_img, segm_val_class
+conv3 = layers.Conv2D(128, (3,3), activation='relu', padding='same')(pool2)
+conv3 = layers.Dropout(0.2)(conv3)
+conv3 = layers.Conv2D(128, (3,3), activation='relu', padding='same')(conv3)
 
-# ## Define neural network
-# model = models.Sequential()
-# model.add(layers.Conv2D(32, (3,3), activation='relu', input_shape=(375,500,3)))
-# model.add(layers.MaxPooling2D((2,2)))
-# model.add(layers.Conv2D(64, (3,3), activation='relu'))
-# model.add(layers.MaxPooling2D((2,2)))
-# model.add(layers.Conv2D(128, (3,3), activation='relu'))
-# model.add(layers.MaxPooling2D((2,2)))
-# model.add(layers.Conv2D(128, (3,3), activation='relu'))
-# model.add(layers.MaxPooling2D((2,2)))
-# model.add(layers.Flatten())
-# model.add(layers.Dropout(0.5))
-# model.add(layers.Dense(512, activation='relu'))
-# model.add(layers.Dense(1, activation='sigmoid'))
+up1 = layers.concatenate([layers.UpSampling2D((2, 2))(conv3), conv2], axis=-1)
+conv4 = layers.Conv2D(64, (3,3), activation='relu', padding='same')(up1)
+conv4 = layers.Dropout(0.2)(conv4)
+conv4 = layers.Conv2D(64, (3,3), activation='relu', padding='same')(conv4)
 
-model = vgg_unet(n_classes=20, input_height=375, input_width=500)
+up2 = layers.concatenate([layers.UpSampling2D((2, 2))(conv2), conv1], axis=-1)
+conv5 = layers.Conv2D(32, (3,3), activation='relu', padding='same')(up2)
+conv5 = layers.Dropout(0.2)(conv5)
+conv5 = layers.Conv2D(32, (3,3), activation='relu', padding='same')(conv5)
+
+out = layers.Conv2D(num_classes+2, (1, 1) , padding='same')(conv5)
+
+#%%
+model = get_segmentation_model(img_input, out) # this would build the segmentation model
 
 model.compile(loss='categorical_crossentropy',
               optimizer=optimizers.RMSprop(lr=1e-4),
               metrics=['acc'])
+#%%
+current_path = os.getcwd()
+weights_path  = os.path.join(current_path, 'segmentation', 'weights_scratch')
 
-# NO_OF_EPOCHS = 10
-# BATCH_SIZE = batch_size
+model_names = weights_path + '\weights.{epoch:02d}-{val_acc:.2f}.hdf5'
+checkpoint = ModelCheckpoint(model_names, monitor='acc', 
+                              verbose=1, save_best_only=True, mode='max')
 
-# weights_path  = os.path.join(current_path, 'segmentation', 'weights_scratch')
-# checkpoint = ModelCheckpoint(weights_path, monitor='acc', 
-#                              verbose=1, save_best_only=True, mode='max')
-# csv_logger = CSVLogger('./log.out', append=True, separator=';')
-# earlystopping = EarlyStopping(monitor='acc', verbose=1,
-#                               min_delta=0.01, patience=3, mode='max')
-# callbacks_list = [checkpoint, csv_logger, earlystopping]
+#os.makedirs(weights_path+'\log.out', mode=0o777, exist_ok=True)
+csv_logger = CSVLogger(weights_path+'\log.out', append=True, separator=';')
 
-# results = model.fit_generator(train_generator,
-#                           epochs=NO_OF_EPOCHS, 
-#                           steps_per_epoch=(NO_OF_TRAINING_IMAGES//BATCH_SIZE),
-#                           validation_data=val_generator, 
-#                           validation_steps=(NO_OF_VAL_IMAGES//BATCH_SIZE), 
-#                           callbacks=callbacks_list)
-# model.save('Model.h5')
+earlystopping = EarlyStopping(monitor='acc', verbose=1,
+                              min_delta=0.01, patience=3, mode='max')
+callbacks_list = [checkpoint, csv_logger, earlystopping]
+
+results = model.fit_generator(train_gen,
+                          epochs=10, 
+                          steps_per_epoch=132,
+                          validation_data=val_gen, 
+                          validation_steps=19, 
+                          callbacks=callbacks_list)
+model.save('Model.h5')
 
