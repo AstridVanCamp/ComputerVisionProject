@@ -37,10 +37,9 @@ def get_PNGsegments(filename, image_dir, resize=False):
         if resize:
             nrows = 256
             ncols = 256
-            img = cv2.resize(img, (ncols,nrows))
+            img = cv2.resize(img, (ncols,nrows), interpolation=cv2.INTER_NEAREST)
         
         #img_mask = one_hot_encode(img, 20)
-        
         images.append(img)    
     
     return np.asarray(images)

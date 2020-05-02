@@ -167,9 +167,9 @@ callbacks_list = [checkpoint, csv_logger, earlystopping]
 
 results = model.fit_generator(train_gen,
                           epochs=10, 
-                          steps_per_epoch=132,
+                          steps_per_epoch=3,
                           validation_data=val_gen, 
-                          validation_steps=19, 
+                          validation_steps=2, 
                           callbacks=callbacks_list)
 model.save('Model.h5')
 
