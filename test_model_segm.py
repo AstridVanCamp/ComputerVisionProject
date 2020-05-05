@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-This is the main file for segmentation from scratch
+Created on Tue May  5 13:33:15 2020
+
+@author: astri
 """
+
 #%% Import modules
 import os
 import random
@@ -123,64 +126,60 @@ print('LOADING DATA FINISHED')
 #%% Define neural network
 img_input = Input(shape=(256,256,3))
 ### AANPASSEN kernel_initializer = 'he_normal'
-"""
-enc=conv drop conv pool
-5=conv drop conv
-dec=convtrafo cat conv drop conv
-out=conv sigmoid
-"""
 # Block 1
 conv1 = Conv2D(64, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(img_input)
-drop1 = Dropout(0.2)(conv1)
-conv1 = Conv2D(64, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop1)
+conv1 = Conv2D(64, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv1)
 pool1 = MaxPooling2D((2,2), strides=(2,2), name='block1_pool')(conv1)
+drop1 = Dropout(0.5)(pool1)
 # Block 2
 conv2 = Conv2D(128, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(pool1)
-drop2 = Dropout(0.2)(conv2)
-conv2 = Conv2D(128, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop2)
+conv2 = Conv2D(128, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv2)
 pool2 = MaxPooling2D((2,2), strides=(2,2), name='block2_pool')(conv2)
+drop2 = Dropout(0.5)(pool2)
 # Block 3
-conv3 = Conv2D(256, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(pool2)
-drop3 = Dropout(0.2)(conv3)
-conv3 = Conv2D(256, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop3)
+conv3 = Conv2D(256, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop2)
+conv3 = Conv2D(256, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv3)
+conv3 = Conv2D(256, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv3)
 pool3 = MaxPooling2D((2,2), strides=(2,2), name='block3_pool')(conv3)
+drop3 = Dropout(0.5)(pool3)
 # Block 4
-conv4 = Conv2D(512, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(pool3)
-drop4 = Dropout(0.2)(conv4)
-conv4 = Conv2D(512, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop4)
+conv4 = Conv2D(512, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop3)
+conv4 = Conv2D(512, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv4)
+conv4 = Conv2D(512, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv4)
 pool4 = MaxPooling2D((2,2), strides=(2,2), name='block4_pool')(conv4)
-
+drop4 = Dropout(0.5)(pool4)
 # Block 5
-conv5 = Conv2D(1024, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(pool4)
-drop5 = Dropout(0.2)(conv5)
-conv5 = Conv2D(1024, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop5)
-
+conv5 = Conv2D(1024, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(drop4)
+conv5 = Conv2D(1024, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv5)
+conv5 = Conv2D(1024, (3,3), activation='relu', padding='same', kernel_initializer = 'he_normal')(conv5)
+pool5 = MaxPooling2D((2,2), strides=(2,2), name='block5_pool')(conv5)
+drop5 = Dropout(0.5)(pool5)
 # Block 6
 up6 = Conv2DTranspose(512, (3,3), strides=(2,2), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv5)
-cat6 = concatenate([up6, conv4], axis=-1)
-conv6 = Conv2D(512, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(cat6)
-drop6 = Dropout(0.2)(conv6)
+up6 = concatenate([up6, conv4], axis=-1)
+drop6 = Dropout(0.2)(up6)
 conv6 = Conv2D(512, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(drop6)
+conv6 = Conv2D(512, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv6)
 # Block 7
 up7 = Conv2DTranspose(256, (3,3), strides=(2,2), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv6)
-cat7 = concatenate([up7, conv3], axis=-1)
-conv7 = Conv2D(256, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(cat7)
-drop7 = Dropout(0.2)(conv7)
+up7 = concatenate([up7, conv3], axis=-1)
+drop7 = Dropout(0.2)(up7)
 conv7 = Conv2D(256, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(drop7)
+conv7 = Conv2D(256, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv7)
 # Block 8
 up8 = Conv2DTranspose(128, (3,3), strides=(2,2), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv7)
-cat8 = concatenate([up8, conv2], axis=-1)
-conv8 = Conv2D(128, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(cat8)
-drop8 = Dropout(0.2)(conv8)
+up8 = concatenate([up8, conv2], axis=-1)
+drop8 = Dropout(0.2)(up8)
 conv8 = Conv2D(128, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(drop8)
+conv8 = Conv2D(128, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv8)
 # Block 9
 up9 = Conv2DTranspose(64, (3,3), strides=(2,2), activation='relu', padding='same')(conv8)
-cat9 = concatenate([up9, conv1], axis=-1)
-conv9 = Conv2D(64, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(cat9)
-drop9 = Dropout(0.2)(conv9)
+up9 = concatenate([up9, conv1], axis=-1)
+drop9 = Dropout(0.2)(up9)
 conv9 = Conv2D(64, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(drop9)
+conv9 = Conv2D(64, (3,3), activation='relu', padding='same',  kernel_initializer = 'he_normal')(conv9)
 
-out = Conv2D(num_classes+2, (1,1), activation='sigmoid', padding='same',  kernel_initializer = 'he_normal')(conv9)
+out = Conv2D(num_classes+2, (1, 1) , padding='same',  kernel_initializer = 'he_normal')(conv9)
 
 #%% Compile neural network
 model = get_segmentation_model(img_input, out) # this would build the segmentation model
@@ -222,8 +221,8 @@ acc = model.predict_generator(val_gen, steps=10)
 pred_val = model.predict_generator(val_gen, steps=10)
 
 pred_val_masks = []
-for i in range(len(pred_val)):
-    mask_color = class_to_color(pred_val[i], num_classes)
+for mask in enumerate(pred_val):
+    mask_color = class_to_color(mask, num_classes)
     pred_val_masks.append(mask_color)
 
 
