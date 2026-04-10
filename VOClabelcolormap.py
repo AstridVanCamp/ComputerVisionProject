@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 """ 
 Python implementation of the color map function for the PASCAL VOC data set. 
-Official Matlab version can be found in the PASCAL VOC devkit 
-http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#devkit
+The functions color_map and color_map_viz are taken from 
+https://gist.github.com/wllhf/a4533e0adebe57e3ed06d4b50c8419ae
+
+The functions color_to_class ans class_to_color use this colormap for the
+conversion between a colour on the segmentation mask and a pixelwise
+class label for semantic segmentation
 """
 import numpy as np
 from skimage.io import imshow
 import matplotlib.pyplot as plt
+import cv2
 
 def color_map(N=256, normalized=False):
     def bitget(byteval, idx):
@@ -44,5 +49,38 @@ def color_map_viz():
     plt.yticks([row_size*i+row_size/2 for i in range(nclasses+1)], labels)
     plt.xticks([])
     plt.show()
+
+
+def color_to_class(mask_color, num_colors):
+    mask_color = cv2.cvtColor(mask_color, cv2.COLOR_BGR2RGB)
     
-color_map_viz()
+    # Define colormap for all classes+background
+    cmap = color_map()[:num_colors+1]
+    
+    # Void colour is set as initial zero value, other colours get index+1
+    mask_class = np.zeros((mask_color.shape[0], mask_color.shape[1]))
+    for idx, color in enumerate(cmap):
+        is_color = cv2.inRange(mask_color, color, color)/255
+        mask_class = mask_class + is_color*(idx+1)
+    
+    return mask_class.reshape((mask_color.shape[0]*mask_color.shape[1],1))
+
+def class_to_color(mask_class, num_colors):    
+    # Define colormap and insert void colour at position 0    
+    cmap = color_map()[:num_colors+1]
+    cmap = np.insert(cmap, 0, [224,224,192], axis=0)
+    
+    # Convert one hot encoding to pixelwise class label
+    mask_class = np.argmax(mask_class, axis=-1)
+    
+    # Return colour based on pixelwise class label
+    mask_color = np.zeros((mask_class.shape[0], 3))
+    for idx, color in enumerate(cmap):
+        is_class = np.where(mask_class==idx)
+        mask_color[is_class] = color
+
+    mask_color = mask_color.reshape((np.int(np.sqrt(mask_class.shape[0])), np.int(np.sqrt(mask_class.shape[0])), 3)).astype(np.uint8)    
+    return cv2.cvtColor(mask_color,cv2.COLOR_RGB2BGR)
+        
+    
+    
